@@ -1,5 +1,7 @@
 # DeepSeek Image Offload for Codex
 
+English | [简体中文](README.zh-CN.md)
+
 A local Responses API proxy that strips stale Base64 images from Codex requests
 before forwarding them to DeepSeek. It is designed for conversations where
 previously inspected images or video frames remain in the transcript and make
