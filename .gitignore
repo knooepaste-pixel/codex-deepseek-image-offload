@@ -1,0 +1,15 @@
+node_modules/
+coverage/
+
+config.json
+.env
+.env.*
+!.env.example
+
+*.log
+*.pid
+*.bak
+
+.DS_Store
+Thumbs.db
+desktop.ini

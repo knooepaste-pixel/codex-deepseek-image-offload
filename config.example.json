@@ -1,0 +1,14 @@
+{
+  "listenHost": "127.0.0.1",
+  "listenPort": 17891,
+  "upstreamBaseUrl": "https://api.deepseek.com",
+  "maxRequestBytes": 46137344,
+  "maxImagePayloadBytes": 25165824,
+  "maxImagesPerRequest": 590,
+  "keepLatestImages": 3,
+  "maxIncomingBytes": 268435456,
+  "maxDecompressedBytes": 268435456,
+  "upstreamConnectTimeoutMs": 30000,
+  "upstreamIdleTimeoutMs": 120000,
+  "logLevel": "info"
+}

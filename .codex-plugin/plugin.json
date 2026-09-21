@@ -1,0 +1,38 @@
+{
+  "name": "deepseek-image-offload",
+  "version": "0.2.0",
+  "description": "Offload stale Base64 images from Codex DeepSeek requests to avoid HTTP 413.",
+  "author": {
+    "name": "knooepaste-pixel",
+    "url": "https://github.com/knooepaste-pixel"
+  },
+  "homepage": "https://github.com/knooepaste-pixel/codex-deepseek-image-offload#readme",
+  "repository": "https://github.com/knooepaste-pixel/codex-deepseek-image-offload",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "deepseek",
+    "image",
+    "413",
+    "proxy",
+    "compaction"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DeepSeek Image Offload",
+    "shortDescription": "\u9632\u6b62\u65e7\u56fe\u7247\u5386\u53f2\u6491\u7206 DeepSeek \u8bf7\u6c42",
+    "longDescription": "Runs a local Responses API proxy that replaces old Base64 image blocks with text placeholders before Codex sends requests to DeepSeek.",
+    "developerName": "knooepaste-pixel",
+    "websiteURL": "https://github.com/knooepaste-pixel/codex-deepseek-image-offload",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "\u542f\u7528 DeepSeek \u56fe\u7247\u5378\u8f7d",
+      "\u68c0\u67e5 DeepSeek \u56fe\u7247\u4e2d\u8f6c\u72b6\u6001",
+      "\u5173\u95ed DeepSeek \u56fe\u7247\u4e2d\u8f6c"
+    ]
+  }
+}

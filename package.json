@@ -1,0 +1,39 @@
+{
+  "name": "codex-deepseek-image-offload",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "A local proxy that offloads stale image payloads from Codex Responses API requests before forwarding to DeepSeek.",
+  "author": {
+    "name": "knooepaste-pixel",
+    "url": "https://github.com/knooepaste-pixel"
+  },
+  "homepage": "https://github.com/knooepaste-pixel/codex-deepseek-image-offload#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knooepaste-pixel/codex-deepseek-image-offload.git"
+  },
+  "bugs": {
+    "url": "https://github.com/knooepaste-pixel/codex-deepseek-image-offload/issues"
+  },
+  "keywords": [
+    "codex",
+    "deepseek",
+    "image",
+    "413",
+    "proxy",
+    "compaction",
+    "responses-api"
+  ],
+  "bin": {
+    "codex-deepseek-image-offload": "./src/server.mjs"
+  },
+  "scripts": {
+    "start": "node ./src/server.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "license": "MIT"
+}
