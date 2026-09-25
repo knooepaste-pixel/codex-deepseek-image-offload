@@ -1,6 +1,6 @@
 {
   "name": "deepseek-image-offload",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Offload stale Base64 images from Codex DeepSeek requests to avoid HTTP 413.",
   "author": {
     "name": "knooepaste-pixel",

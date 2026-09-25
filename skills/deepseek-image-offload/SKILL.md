@@ -40,8 +40,9 @@ pwsh.exe -NoLogo -NoProfile -File "<plugin-root>\scripts\start.ps1"
 
 Use the enable script. It starts the proxy, waits for its health endpoint, then
 changes only the `base_url` inside `[model_providers.custom]` in
-`~/.codex/config.toml`. It also installs a user logon shortcut so the proxy is
-available after a restart. It creates a one-time backup beside the config file.
+`~/.codex/config.toml`. It also installs a user logon task with a watchdog so
+the proxy is restarted if it exits or stops responding. It creates a one-time
+backup beside the config file.
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File "<plugin-root>\scripts\enable.ps1"
@@ -53,7 +54,7 @@ providers until a new thread is running through the proxy.
 
 ## Disable
 
-Restore direct DeepSeek traffic, remove the logon shortcut, and stop the local
+Restore direct DeepSeek traffic, remove the logon task and watchdog, and stop the local
 proxy.
 
 ```powershell
@@ -82,6 +83,8 @@ images are offloaded as well so the final request can stay valid.
 - Do not edit `config.toml` by hand if `enable.ps1` or `disable.ps1` can do it.
 - Do not stop the proxy while `[model_providers.custom]` still points at the
   local URL, because new DeepSeek turns would fail to reach the upstream.
+- Use `stop.ps1` to remove the watchdog as well as the proxy. Only use
+  `stop.ps1 -KeepAutostart` when a restart is intentional.
 - Keep the proxy bound to `127.0.0.1`; do not expose it on the LAN.
 - The proxy keeps the newest three images by default. Older images become
   placeholders and stay offloaded on later turns.

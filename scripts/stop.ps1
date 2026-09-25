@@ -1,38 +1,40 @@
+[CmdletBinding()]
+param(
+    [switch]$KeepAutostart
+)
+
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "service-common.ps1")
 
-$LogDir = Join-Path $env:LOCALAPPDATA "Codex\deepseek-image-offload"
-$PidFile = Join-Path $LogDir "service.pid"
+$Settings = Get-OffloadServiceSettings
 
-function Test-OffloadProcess {
-    param([int]$ProcessId)
-
-    $ProcessInfo = Get-CimInstance Win32_Process `
-        -Filter "ProcessId = $ProcessId" `
-        -ErrorAction SilentlyContinue
-    if (-not $ProcessInfo) {
-        return $false
-    }
-
-    return (
-        $ProcessInfo.Name -eq "node.exe" -and
-        $ProcessInfo.CommandLine -like "*deepseek-image-offload*" -and
-        $ProcessInfo.CommandLine -like "*src\server.mjs*"
-    )
+if (-not $KeepAutostart) {
+    & (Join-Path $PSScriptRoot "remove-autostart.ps1") | Write-Host
 }
 
-if (-not (Test-Path -LiteralPath $PidFile)) {
+$StoppedPids = @()
+$RecordedPid = Get-RecordedOffloadProcessId -Settings $Settings
+if (
+    $RecordedPid -and
+    (Test-OffloadProcess -Settings $Settings -ProcessId $RecordedPid)
+) {
+    Stop-Process -Id $RecordedPid -Force -ErrorAction SilentlyContinue
+    $StoppedPids += $RecordedPid
+}
+
+foreach ($Process in (Get-AllOffloadServerProcesses)) {
+    if ($StoppedPids -notcontains $Process.ProcessId) {
+        Stop-Process `
+            -Id $Process.ProcessId `
+            -Force `
+            -ErrorAction SilentlyContinue
+        $StoppedPids += $Process.ProcessId
+    }
+}
+Clear-OffloadPidFile -Settings $Settings
+
+if ($StoppedPids.Count -eq 0) {
     Write-Output "not-running"
-    exit 0
+} else {
+    Write-Output "stopped:$($StoppedPids -join ',')"
 }
-
-$ServicePid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue
-if ($ServicePid) {
-    if (Test-OffloadProcess -ProcessId ([int]$ServicePid)) {
-        Stop-Process -Id ([int]$ServicePid)
-        Write-Output "stopped:$ServicePid"
-    } else {
-        Write-Output "stale-pid"
-    }
-}
-
-Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue

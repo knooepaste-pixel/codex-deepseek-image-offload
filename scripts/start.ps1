@@ -1,50 +1,104 @@
+[CmdletBinding()]
+param(
+    [int]$HealthTimeoutSeconds = 15
+)
+
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "service-common.ps1")
 
-$Root = Split-Path -Parent $PSScriptRoot
-$LogDir = Join-Path $env:LOCALAPPDATA "Codex\deepseek-image-offload"
-$StdoutLog = Join-Path $LogDir "service.stdout.log"
-$StderrLog = Join-Path $LogDir "service.stderr.log"
-$PidFile = Join-Path $LogDir "service.pid"
+$Settings = Get-OffloadServiceSettings
+New-Item -ItemType Directory -Force -Path $Settings.LogDir | Out-Null
 
-New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-
-function Test-OffloadProcess {
-    param([int]$ProcessId)
-
-    $ProcessInfo = Get-CimInstance Win32_Process `
-        -Filter "ProcessId = $ProcessId" `
-        -ErrorAction SilentlyContinue
-    if (-not $ProcessInfo) {
-        return $false
-    }
-
-    return (
-        $ProcessInfo.Name -eq "node.exe" -and
-        $ProcessInfo.CommandLine -like "*deepseek-image-offload*" -and
-        $ProcessInfo.CommandLine -like "*src\server.mjs*"
-    )
-}
-
-if (Test-Path -LiteralPath $PidFile) {
-    $ExistingPid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue
-    if ($ExistingPid) {
-        if (Test-OffloadProcess -ProcessId ([int]$ExistingPid)) {
-            Write-Output "already-running:$ExistingPid"
-            exit 0
+if (Test-OffloadHealth -Settings $Settings) {
+    $ExistingPid = Get-RecordedOffloadProcessId -Settings $Settings
+    if (-not $ExistingPid) {
+        $RunningProcess = Get-OffloadServerProcesses -Settings $Settings |
+            Select-Object -First 1
+        $ExistingPid = $RunningProcess.ProcessId
+        if ($ExistingPid) {
+            Set-Content `
+                -LiteralPath $Settings.PidFile `
+                -Value $ExistingPid `
+                -Encoding ascii
         }
     }
-    Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+    Write-Output "already-running:$ExistingPid"
+    return
 }
 
-$Node = (Get-Command node -ErrorAction Stop).Source
-$Server = Join-Path $Root "src\server.mjs"
-$Process = Start-Process -FilePath $Node `
-    -ArgumentList @($Server) `
-    -WorkingDirectory $Root `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $StdoutLog `
-    -RedirectStandardError $StderrLog `
-    -PassThru
+$Mutex = [System.Threading.Mutex]::new(
+    $false,
+    "Local\CodexDeepSeekImageOffloadStart"
+)
+$HasMutex = $false
 
-Set-Content -LiteralPath $PidFile -Value $Process.Id -Encoding ascii
-Write-Output "started:$($Process.Id)"
+try {
+    $HasMutex = $Mutex.WaitOne([TimeSpan]::FromSeconds(20))
+    if (-not $HasMutex) {
+        throw "Timed out waiting for another image offload start operation."
+    }
+
+    if (Test-OffloadHealth -Settings $Settings) {
+        Write-Output "already-running"
+        return
+    }
+
+    # Clear only hung processes that belong to this checkout.
+    foreach ($ExistingProcess in (Get-OffloadServerProcesses -Settings $Settings)) {
+        Stop-Process -Id $ExistingProcess.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    Clear-OffloadPidFile -Settings $Settings
+
+    $Node = Get-NodePath
+    $Process = Start-Process -FilePath $Node `
+        -ArgumentList @($Settings.ServerPath) `
+        -WorkingDirectory $Settings.Root `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $Settings.StdoutLog `
+        -RedirectStandardError $Settings.StderrLog `
+        -PassThru
+
+    Set-Content `
+        -LiteralPath $Settings.PidFile `
+        -Value $Process.Id `
+        -Encoding ascii
+
+    $Deadline = (Get-Date).AddSeconds($HealthTimeoutSeconds)
+    while ((Get-Date) -lt $Deadline) {
+        if (Test-OffloadHealth -Settings $Settings) {
+            Write-Output "started:$($Process.Id)"
+            return
+        }
+        if ($Process.HasExited) {
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    if (-not $Process.HasExited) {
+        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+    }
+    Clear-OffloadPidFile -Settings $Settings
+
+    $Detail = ""
+    if (Test-Path -LiteralPath $Settings.StderrLog) {
+        $Detail = (
+            Get-Content -Tail 20 -LiteralPath $Settings.StderrLog
+        ) -join [Environment]::NewLine
+    }
+    if (-not $Detail) {
+        $Detail = (
+            Get-Content -Tail 20 -LiteralPath $Settings.StdoutLog
+        ) -join [Environment]::NewLine
+    }
+    throw (
+        "Image offload proxy did not become healthy at " +
+        "$($Settings.HealthUrl) within $HealthTimeoutSeconds seconds." +
+        $(if ($Detail) { "`n$Detail" } else { "" })
+    )
+} finally {
+    if ($HasMutex) {
+        $Mutex.ReleaseMutex()
+    }
+    $Mutex.Dispose()
+}

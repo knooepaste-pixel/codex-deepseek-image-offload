@@ -1,30 +1,22 @@
 [CmdletBinding()]
 param(
     [string]$ConfigPath = (Join-Path $HOME ".codex\config.toml"),
-    [string]$ProxyUrl = "http://127.0.0.1:17891",
+    [string]$ProxyUrl,
     [switch]$NoStart,
     [switch]$NoAutostart
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "service-common.ps1")
+
+$Settings = Get-OffloadServiceSettings
+if (-not $ProxyUrl) {
+    $ProxyUrl = "http://127.0.0.1:$($Settings.Port)"
+}
 
 if (-not $NoStart) {
     & (Join-Path $PSScriptRoot "start.ps1") | Write-Host
-
-    $Ready = $false
-    for ($Attempt = 0; $Attempt -lt 20; $Attempt += 1) {
-        try {
-            $Health = Invoke-RestMethod -Uri "$ProxyUrl/health" -TimeoutSec 2
-            if ($Health.ok) {
-                $Ready = $true
-                break
-            }
-        } catch {
-            Start-Sleep -Milliseconds 250
-        }
-    }
-
-    if (-not $Ready) {
+    if (-not (Test-OffloadHealth -Settings $Settings -TimeoutSec 3)) {
         throw "Image offload proxy did not become healthy at $ProxyUrl"
     }
 }

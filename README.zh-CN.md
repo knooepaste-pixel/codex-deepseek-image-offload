@@ -50,10 +50,10 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 
 `enable.ps1` 会完成以下操作：
 
-1. 启动本地代理并等待健康检查通过；
+1. 启动本地代理并等待健康检查通过，失败时显示最近的启动日志；
 2. 把 `[model_providers.custom].base_url` 改为
    `http://127.0.0.1:17891`；
-3. 安装登录时自动启动代理的快捷方式；
+3. 安装登录任务和轻量看门狗，代理退出或失联时自动重启；
 4. 在修改配置前创建一次备份。
 
 启用后请新建一个 Codex 对话，让 Codex 重新读取 provider 配置。
@@ -83,6 +83,10 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\disable.ps1 -StopService
 ```
 
 代理最多接收 256 MiB 的压缩请求数据，并单独限制解压后的内容为 256 MiB。
+
+`start.ps1` 只有在健康检查通过后才会报告成功。如果端口被占用或 Node
+无法启动，脚本会返回失败并附带最近日志，不会留下一个看起来正常的旧
+PID 文件。
 
 ## 配置
 
@@ -114,6 +118,8 @@ npm test
 
 - 保持代理只绑定 `127.0.0.1`，不要暴露到局域网；
 - 当 custom provider 仍指向本地代理时，不要直接停止代理；
+- `stop.ps1` 默认会同时移除看门狗和登录任务。只有确实希望看门狗立即
+  拉起重启时，才使用 `stop.ps1 -KeepAutostart`；
 - 代理会从上游请求中移除旧图片。如果后续仍可能需要这些图片，请保留本地原图。
 
 ## 许可证

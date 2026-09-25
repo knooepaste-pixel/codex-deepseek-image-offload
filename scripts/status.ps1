@@ -1,14 +1,25 @@
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "service-common.ps1")
 
-$Port = if ($env:CODEX_IMAGE_OFFLOAD_PORT) {
-    [int]$env:CODEX_IMAGE_OFFLOAD_PORT
-} else {
-    17891
-}
+$Settings = Get-OffloadServiceSettings
 
 try {
-    Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 3 |
+    Invoke-RestMethod -Uri $Settings.HealthUrl -TimeoutSec 3 |
         ConvertTo-Json -Depth 8
 } catch {
-    Write-Error "Image offload proxy is not reachable on port $Port"
+    $RecordedPid = Get-RecordedOffloadProcessId -Settings $Settings
+    $ProcessText = if (
+        $RecordedPid -and
+        (Test-OffloadProcess -Settings $Settings -ProcessId $RecordedPid)
+    ) {
+        " Recorded PID $RecordedPid exists but is not healthy."
+    } else {
+        ""
+    }
+    Write-Error (
+        "Image offload proxy is not reachable at $($Settings.HealthUrl)." +
+        $ProcessText +
+        " Check $($Settings.StderrLog) and $($Settings.WatchLog), " +
+        "then run start.ps1."
+    )
 }

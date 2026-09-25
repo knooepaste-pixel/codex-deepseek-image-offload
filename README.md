@@ -43,8 +43,10 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 
 `enable.ps1` starts the proxy, waits for its health endpoint, points
 `[model_providers.custom].base_url` at `http://127.0.0.1:17891`, and installs a
-logon shortcut. Open a new Codex conversation after enabling it so Codex loads
-the updated provider configuration.
+logon task with a lightweight watchdog. The watchdog checks the local health
+endpoint and restarts the proxy if the Node process exits or stops responding.
+Open a new Codex conversation after enabling it so Codex loads the updated
+provider configuration.
 
 Check status:
 
@@ -75,6 +77,10 @@ changing the provider base URL.
 
 The proxy accepts up to 256 MiB of incoming request data and protects
 decompression with a separate 256 MiB limit.
+
+`start.ps1` waits until the health endpoint is ready before reporting success.
+If the port is already occupied or Node cannot start, it returns a non-zero exit
+code and includes the recent service log instead of leaving a stale PID file.
 
 ## Configuration
 
@@ -108,6 +114,9 @@ dependencies.
 - Keep the proxy bound to `127.0.0.1`; do not expose it to your LAN.
 - Do not stop the proxy while the custom provider still points at its local
   URL, because new DeepSeek requests would fail to reach the upstream.
+- `stop.ps1` removes the watchdog and logon task as well as stopping the proxy.
+  Use `stop.ps1 -KeepAutostart` only when you intentionally want the watchdog
+  to restart it.
 - The proxy can remove old visual evidence from the upstream request. Keep the
   original images locally if they may be needed later.
 
