@@ -45,20 +45,53 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 `[model_providers.custom].base_url` at `http://127.0.0.1:17891`, and installs a
 logon task with a lightweight watchdog. The watchdog checks the local health
 endpoint and restarts the proxy if the Node process exits or stops responding.
-Open a new Codex conversation after enabling it so Codex loads the updated
+Open or fork a Codex conversation after enabling it so Codex loads the updated
 provider configuration.
 
-Check status:
+After the first successful enable, the version-independent command is:
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" status
+```
+
+It also accepts `start`, `stop`, `restart`, `enable`, `direct`, and `disable`.
+Check the repository script directly when you have not enabled the proxy yet:
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File .\scripts\status.ps1
 ```
 
-Disable the proxy and restore direct DeepSeek traffic:
+Restore direct DeepSeek traffic while keeping the proxy and watchdog ready:
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" direct
+```
+
+Disable the proxy completely, including the watchdog:
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File .\scripts\disable.ps1 -StopService
 ```
+
+## Conversation Routing
+
+Codex resolves the model provider when a conversation is started, resumed, or
+forked. It does not reload `base_url` before every message. An already-open
+conversation keeps the provider it was created with.
+
+Use this behavior deliberately:
+
+- Before image-heavy work, run `enable`, then start or fork a conversation.
+- A normal message in an already-open conversation will not switch routes.
+- To keep the proxy ready but send new conversations directly to DeepSeek, run
+  `direct`.
+- To stop the proxy and remove its watchdog completely, run `disable`.
+- If you need the same context after changing routes, use Codex's Fork/Branch
+  action. The fork inherits the conversation history and uses the current route.
+
+For most users, leaving the proxy enabled is simplest. Ordinary requests pass
+through unchanged; image payloads are modified only when a request exceeds the
+configured limits.
 
 ## Commands
 
@@ -70,6 +103,14 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\disable.ps1 -StopService
 .\scripts\install-autostart.ps1
 .\scripts\remove-autostart.ps1
 .\scripts\stop.ps1
+```
+
+The stable wrapper installed in `%LOCALAPPDATA%\Codex\deepseek-image-offload`
+keeps the same commands in one version-independent path:
+
+```powershell
+& "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" status
+& "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" direct
 ```
 
 `enable.ps1` creates a one-time backup beside `~/.codex/config.toml` before

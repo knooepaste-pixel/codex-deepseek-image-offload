@@ -54,20 +54,52 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 2. 把 `[model_providers.custom].base_url` 改为
    `http://127.0.0.1:17891`；
 3. 安装登录任务和轻量看门狗，代理退出或失联时自动重启；
-4. 在修改配置前创建一次备份。
+4. 在修改配置前创建一次备份；
+5. 在 `%LOCALAPPDATA%\Codex\deepseek-image-offload\offload.ps1` 安装一个
+   版本无关的命令入口。
 
-启用后请新建一个 Codex 对话，让 Codex 重新读取 provider 配置。
+启用后请新建或分支一个 Codex 对话，让 Codex 重新读取 provider 配置。
 
 检查运行状态：
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" status
+```
+
+第一次启用前，也可以直接运行仓库脚本：
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File .\scripts\status.ps1
 ```
 
-关闭代理并恢复直连 DeepSeek：
+恢复 DeepSeek 直连，但让代理和看门狗继续待机：
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" direct
+```
+
+彻底停用代理并移除看门狗：
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File .\scripts\disable.ps1 -StopService
+```
+
+## 对话与路由
+
+Codex 会在对话新建、恢复或分支时确定 provider，不会在每条新消息发送前重新
+读取 `base_url`。已经打开的对话会继续使用它创建时的路由。
+
+因此切换路由时要注意：
+
+- 需要处理大量图片时，先执行 `enable`，再新建或分支一个对话；
+- 在已经打开的对话里继续发消息，不会切换路由；
+- 希望保留代理和看门狗，但让之后的新对话直连 DeepSeek，使用 `direct`；
+- 希望彻底停止代理并移除看门狗，使用 `disable`；
+- 切换路由后仍需要原来的上下文，使用 Codex 的分支/Fork 功能。分支会继承
+  对话历史，并使用创建分支时的当前路由。
+
+对多数用户来说，直接保持代理开启最省事。普通请求会原样转发，只有请求超过
+配置上限时才会改写图片载荷。
 ```
 
 ## 常用命令
@@ -80,6 +112,13 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\disable.ps1 -StopService
 .\scripts\install-autostart.ps1
 .\scripts\remove-autostart.ps1
 .\scripts\stop.ps1
+```
+
+安装后的稳定入口把常用命令集中到一个不会随插件缓存版本变化的位置：
+
+```powershell
+& "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" status
+& "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" direct
 ```
 
 代理最多接收 256 MiB 的压缩请求数据，并单独限制解压后的内容为 256 MiB。

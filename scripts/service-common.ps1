@@ -40,11 +40,60 @@ function Get-OffloadServiceSettings {
         PidFile = Join-Path $LogDir "service.pid"
         WatchPidFile = Join-Path $LogDir "watch.pid"
         WatchLog = Join-Path $LogDir "watchdog.log"
+        LauncherPath = Join-Path $LogDir "watch-launcher.ps1"
+        OffloadPath = Join-Path $LogDir "offload.ps1"
         ServerPath = Join-Path $Root "src\server.mjs"
         StartScript = Join-Path $Root "scripts\start.ps1"
         WatchScript = Join-Path $Root "scripts\watch.ps1"
         StopScript = Join-Path $Root "scripts\stop.ps1"
     }
+}
+
+function Test-OffloadProxyUrl {
+    param(
+        [string]$Url,
+        [int]$Port = 0
+    )
+
+    if (-not $Url) {
+        return $false
+    }
+
+    try {
+        $Parsed = [System.Uri]$Url
+    } catch {
+        return $false
+    }
+
+    $IsLoopback = (
+        $Parsed.Host -eq "127.0.0.1" -or
+        $Parsed.Host -eq "localhost" -or
+        $Parsed.Host -eq "::1"
+    )
+    return (
+        $Parsed.Scheme -eq "http" -and
+        $IsLoopback -and
+        ($Port -eq 0 -or $Parsed.Port -eq $Port)
+    )
+}
+
+function Test-DeepSeekBaseUrl {
+    param([string]$Url)
+
+    if (-not $Url) {
+        return $false
+    }
+
+    try {
+        $Parsed = [System.Uri]$Url
+    } catch {
+        return $false
+    }
+
+    return (
+        $Parsed.Scheme -eq "https" -and
+        $Parsed.Host -eq "api.deepseek.com"
+    )
 }
 
 function Test-OffloadHealth {

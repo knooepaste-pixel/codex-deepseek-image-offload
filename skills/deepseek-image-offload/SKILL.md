@@ -24,6 +24,18 @@ Run scripts with `pwsh.exe`, not Windows PowerShell 5.1.
 
 ## Status
 
+After the first successful enable, prefer the version-independent command:
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" status
+```
+
+It accepts `status`, `start`, `stop`, `restart`, `enable`, `direct`, and
+`disable`.
+Use single backslashes in Windows paths. A doubled path separator such as
+`C:\Users\name\\.codex` is not a PowerShell escape and may refer to the wrong
+path.
+
 Check the service first:
 
 ```powershell
@@ -48,14 +60,24 @@ backup beside the config file.
 pwsh.exe -NoLogo -NoProfile -File "<plugin-root>\scripts\enable.ps1"
 ```
 
-After enabling, tell the user to start a new Codex conversation so the changed
-provider configuration is loaded. Do not claim this thread has switched
+After enabling, tell the user to start or fork a new Codex conversation so the
+changed provider configuration is loaded. Do not claim this thread has switched
 providers until a new thread is running through the proxy.
+
+Codex resolves the model provider when a conversation is started, resumed, or
+forked. It does not reload `base_url` for every message, and an already-open
+conversation keeps its current provider. If the user needs the same context
+under a different route, use Fork/Branch after switching the route.
 
 ## Disable
 
-Restore direct DeepSeek traffic, remove the logon task and watchdog, and stop the local
-proxy.
+Restore direct DeepSeek traffic while keeping the proxy and watchdog ready:
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File "$env:LOCALAPPDATA\Codex\deepseek-image-offload\offload.ps1" direct
+```
+
+Remove the logon task and watchdog, and stop the local proxy completely:
 
 ```powershell
 pwsh.exe -NoLogo -NoProfile -File "<plugin-root>\scripts\disable.ps1" -StopService

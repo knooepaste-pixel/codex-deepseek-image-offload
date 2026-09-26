@@ -14,17 +14,6 @@ if (-not $ProxyUrl) {
     $ProxyUrl = "http://127.0.0.1:$($Settings.Port)"
 }
 
-if (-not $NoStart) {
-    & (Join-Path $PSScriptRoot "start.ps1") | Write-Host
-    if (-not (Test-OffloadHealth -Settings $Settings -TimeoutSec 3)) {
-        throw "Image offload proxy did not become healthy at $ProxyUrl"
-    }
-}
-
-if (-not $NoAutostart) {
-    & (Join-Path $PSScriptRoot "install-autostart.ps1") | Write-Host
-}
-
 if (-not (Test-Path -LiteralPath $ConfigPath)) {
     throw "Codex config not found: $ConfigPath"
 }
@@ -38,7 +27,22 @@ if (-not $ProviderMatch.Success) {
 
 $ProviderBlock = $ProviderMatch.Value
 $BaseUrlPattern = "(?m)^base_url\s*=.*$"
-if ([regex]::IsMatch($ProviderBlock, $BaseUrlPattern)) {
+$BaseUrlMatch = [regex]::Match($ProviderBlock, $BaseUrlPattern)
+if ($BaseUrlMatch.Success) {
+    $CurrentBaseUrl = [regex]::Match(
+        $BaseUrlMatch.Value,
+        '=\s*"(?<url>[^"]+)"'
+    ).Groups["url"].Value
+    $IsProxyUrl = Test-OffloadProxyUrl -Url $CurrentBaseUrl
+    if (-not $IsProxyUrl -and -not (Test-DeepSeekBaseUrl -Url $CurrentBaseUrl)) {
+        throw (
+            "Refusing to enable image offload: [model_providers.custom] " +
+            "currently points to '$CurrentBaseUrl', not DeepSeek. " +
+            "Set that provider to https://api.deepseek.com first. " +
+            "The plugin will not redirect another provider's traffic."
+        )
+    }
+
     $UpdatedBlock = [regex]::Replace(
         $ProviderBlock,
         $BaseUrlPattern,
@@ -54,6 +58,17 @@ if ([regex]::IsMatch($ProviderBlock, $BaseUrlPattern)) {
         $InsertAt,
         "base_url = `"$ProxyUrl`"`r`n"
     )
+}
+
+if (-not $NoStart) {
+    & (Join-Path $PSScriptRoot "start.ps1") | Write-Host
+    if (-not (Test-OffloadHealth -Settings $Settings -TimeoutSec 3)) {
+        throw "Image offload proxy did not become healthy at $ProxyUrl"
+    }
+}
+
+if (-not $NoAutostart) {
+    & (Join-Path $PSScriptRoot "install-autostart.ps1") | Write-Host
 }
 
 if ($UpdatedBlock -eq $ProviderBlock) {

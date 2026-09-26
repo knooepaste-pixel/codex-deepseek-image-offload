@@ -1,6 +1,6 @@
 {
   "name": "codex-deepseek-image-offload",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "A local proxy that offloads stale image payloads from Codex Responses API requests before forwarding to DeepSeek.",

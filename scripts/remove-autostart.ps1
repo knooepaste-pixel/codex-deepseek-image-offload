@@ -11,6 +11,7 @@ $StartupDirectory = [Environment]::GetFolderPath("Startup")
 $ShortcutPath = Join-Path $StartupDirectory $script:OffloadShortcutName
 $RemovedTask = $false
 $RemovedShortcut = $false
+$RemovedLauncher = $false
 
 if (Get-ScheduledTask -TaskName $script:OffloadTaskName -ErrorAction SilentlyContinue) {
     Stop-ScheduledTask `
@@ -39,6 +40,14 @@ if (-not $KeepWatchdog) {
         -LiteralPath $Settings.WatchPidFile `
         -Force `
         -ErrorAction SilentlyContinue
+
+    if (Test-Path -LiteralPath $Settings.LauncherPath) {
+        Remove-Item `
+            -LiteralPath $Settings.LauncherPath `
+            -Force `
+            -ErrorAction SilentlyContinue
+        $RemovedLauncher = $true
+    }
 }
 
 if ($RemovedTask) {
@@ -47,6 +56,13 @@ if ($RemovedTask) {
 if ($RemovedShortcut) {
     Write-Output "autostart-removed:startup:$ShortcutPath"
 }
-if (-not $RemovedTask -and -not $RemovedShortcut) {
+if ($RemovedLauncher) {
+    Write-Output "autostart-removed:launcher:$($Settings.LauncherPath)"
+}
+if (
+    -not $RemovedTask -and
+    -not $RemovedShortcut -and
+    -not $RemovedLauncher
+) {
     Write-Output "autostart-not-installed"
 }

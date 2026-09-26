@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "service-common.ps1")
 
 if (-not (Test-Path -LiteralPath $ConfigPath)) {
     throw "Codex config not found: $ConfigPath"
@@ -21,15 +22,25 @@ if (-not $ProviderMatch.Success) {
 
 $ProviderBlock = $ProviderMatch.Value
 $BaseUrlPattern = "(?m)^base_url\s*=.*$"
-if (-not [regex]::IsMatch($ProviderBlock, $BaseUrlPattern)) {
+$BaseUrlMatch = [regex]::Match($ProviderBlock, $BaseUrlPattern)
+if (-not $BaseUrlMatch.Success) {
     throw "Could not find base_url in [model_providers.custom]"
 }
 
-$UpdatedBlock = [regex]::Replace(
-    $ProviderBlock,
-    $BaseUrlPattern,
-    "base_url = `"$DeepSeekBaseUrl`""
-)
+$CurrentBaseUrl = [regex]::Match(
+    $BaseUrlMatch.Value,
+    '=\s*"(?<url>[^"]+)"'
+).Groups["url"].Value
+$IsProxyUrl = Test-OffloadProxyUrl -Url $CurrentBaseUrl
+$UpdatedBlock = $ProviderBlock
+
+if ($IsProxyUrl) {
+    $UpdatedBlock = [regex]::Replace(
+        $ProviderBlock,
+        $BaseUrlPattern,
+        "base_url = `"$DeepSeekBaseUrl`""
+    )
+}
 
 if ($UpdatedBlock -ne $ProviderBlock) {
     $UpdatedContent = $Content.Remove(
@@ -41,7 +52,11 @@ if ($UpdatedBlock -ne $ProviderBlock) {
     [System.IO.File]::WriteAllText($ConfigPath, $UpdatedContent, $Utf8NoBom)
 }
 
-Write-Output "disabled:$DeepSeekBaseUrl"
+if ($IsProxyUrl) {
+    Write-Output "disabled:$DeepSeekBaseUrl"
+} else {
+    Write-Output "already-disabled:$CurrentBaseUrl"
+}
 Write-Output "restart-codex-thread-required"
 
 if (-not $KeepAutostart) {
