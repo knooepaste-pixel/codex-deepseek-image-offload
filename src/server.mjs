@@ -224,13 +224,16 @@ async function proxyRequest(req, res, config, logger, stats) {
       () => controller.abort(new Error("Upstream response headers timed out")),
       config.upstreamConnectTimeoutMs,
     );
-    upstreamResponse = await fetch(upstreamUrl, {
+    const upstreamRequest = {
       method: req.method,
       headers: upstreamHeaders,
-      body: bodyForUpstream,
       signal: controller.signal,
       redirect: "manual",
-    });
+    };
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      upstreamRequest.body = bodyForUpstream;
+    }
+    upstreamResponse = await fetch(upstreamUrl, upstreamRequest);
   } catch (error) {
     if (clientAborted) {
       return;

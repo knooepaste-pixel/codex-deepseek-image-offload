@@ -124,6 +124,53 @@ test("health endpoint reports configuration and stats", async () => {
   await close(proxy);
 });
 
+test("GET and HEAD model probes reach upstream without a request body", async () => {
+  const received = [];
+  const upstream = http.createServer(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) {
+      body += chunk;
+    }
+    received.push({ method: req.method, body });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(req.method === "HEAD" ? undefined : '{"data":[]}');
+  });
+  const upstreamPort = await listen(upstream);
+  const config = {
+    listenHost: "127.0.0.1",
+    listenPort: 0,
+    upstreamBaseUrl: `http://127.0.0.1:${upstreamPort}`,
+    maxRequestBytes: 1000,
+    maxImagePayloadBytes: 500,
+    maxImagesPerRequest: 590,
+    keepLatestImages: 2,
+    maxIncomingBytes: 1024,
+    maxDecompressedBytes: 1024,
+    upstreamConnectTimeoutMs: 5000,
+    upstreamIdleTimeoutMs: 5000,
+    logLevel: "silent",
+  };
+  const proxy = await createServer(config, createLogger("silent"));
+  const proxyPort = await listen(proxy);
+
+  const getResponse = await fetch(`http://127.0.0.1:${proxyPort}/v1/models`);
+  assert.equal(getResponse.status, 200);
+  assert.deepEqual(await getResponse.json(), { data: [] });
+
+  const headResponse = await fetch(`http://127.0.0.1:${proxyPort}/v1/models`, {
+    method: "HEAD",
+  });
+  assert.equal(headResponse.status, 200);
+  assert.equal(await headResponse.text(), "");
+  assert.deepEqual(received, [
+    { method: "GET", body: "" },
+    { method: "HEAD", body: "" },
+  ]);
+
+  await close(proxy);
+  await close(upstream);
+});
+
 test("rejects a compressed request that exceeds the decompressed safety limit", async () => {
   const config = {
     listenHost: "127.0.0.1",

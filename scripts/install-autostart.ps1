@@ -9,7 +9,13 @@ $ErrorActionPreference = "Stop"
 $Settings = Get-OffloadServiceSettings
 New-Item -ItemType Directory -Force -Path $Settings.LogDir | Out-Null
 
-& (Join-Path $PSScriptRoot "install-command-wrapper.ps1") | Write-Host
+$IsCachedRuntime = $Settings.Root -match '[\\/]\.codex[\\/]plugins[\\/]cache[\\/]'
+if ($IsCachedRuntime) {
+    & (Join-Path $PSScriptRoot "install-command-wrapper.ps1") | Write-Host
+} else {
+    & (Join-Path $PSScriptRoot "install-command-wrapper.ps1") `
+        -RuntimeRoot $Settings.Root | Write-Host
+}
 
 $PluginFamilyRoot = Split-Path -Parent $Settings.Root
 $EscapedPluginFamilyRoot = $PluginFamilyRoot.Replace("'", "''")
@@ -84,6 +90,11 @@ if (-not (Test-Path -LiteralPath $Settings.WatchScript)) {
     throw "Watch script not found: $($Settings.WatchScript)"
 }
 
+$TaskScriptPath = if ($IsCachedRuntime) {
+    $Settings.LauncherPath
+} else {
+    $Settings.WatchScript
+}
 $Pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
 $StartupDirectory = [Environment]::GetFolderPath("Startup")
 $ShortcutPath = Join-Path $StartupDirectory $script:OffloadShortcutName
@@ -93,12 +104,17 @@ try {
         -Execute $Pwsh `
         -Argument (
             "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden " +
-            "-File `"$($Settings.LauncherPath)`""
-        )
+            "-File `"$TaskScriptPath`""
+        ) `
+        -WorkingDirectory $Settings.Root
     $LogonTrigger = New-ScheduledTaskTrigger `
         -AtLogOn `
         -User "$env:USERDOMAIN\$env:USERNAME"
     $LogonTrigger.Delay = "PT10S"
+    $RetryTrigger = New-ScheduledTaskTrigger `
+        -Once `
+        -At (Get-Date).AddSeconds(10) `
+        -RepetitionInterval (New-TimeSpan -Minutes 1)
     $TaskSettings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries `
@@ -115,7 +131,7 @@ try {
     Register-ScheduledTask `
         -TaskName $script:OffloadTaskName `
         -Action $Action `
-        -Trigger @($LogonTrigger) `
+        -Trigger @($LogonTrigger, $RetryTrigger) `
         -Settings $TaskSettings `
         -Principal $Principal `
         -Force `
@@ -131,7 +147,7 @@ try {
     $Shortcut.TargetPath = $Pwsh
     $Shortcut.Arguments = (
         "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden " +
-        "-File `"$($Settings.LauncherPath)`""
+        "-File `"$TaskScriptPath`""
     )
     $Shortcut.WorkingDirectory = $Settings.Root
     $Shortcut.WindowStyle = 7
@@ -142,7 +158,7 @@ try {
         Start-Process -FilePath $Pwsh `
             -ArgumentList (
                 "-NoLogo -NoProfile -ExecutionPolicy Bypass " +
-                "-WindowStyle Hidden -File `"$($Settings.LauncherPath)`""
+                "-WindowStyle Hidden -File `"$TaskScriptPath`""
             ) `
             -WorkingDirectory $Settings.Root `
             -WindowStyle Hidden

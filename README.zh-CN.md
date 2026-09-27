@@ -58,6 +58,10 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 5. 在 `%LOCALAPPDATA%\Codex\deepseek-image-offload\offload.ps1` 安装一个
    版本无关的命令入口。
 
+计划任务每分钟还会检查一次，以便看门狗本身退出后自动恢复。请从
+`.codex/plugins/cache` 之外的稳定目录安装；计划任务和命令入口会固定指向
+该目录，清理插件缓存不会影响服务。启用期间不要移动或删除这个目录。
+
 启用后请新建或分支一个 Codex 对话，让 Codex 重新读取 provider 配置。
 
 检查运行状态：

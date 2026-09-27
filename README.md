@@ -45,6 +45,11 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\enable.ps1
 `[model_providers.custom].base_url` at `http://127.0.0.1:17891`, and installs a
 logon task with a lightweight watchdog. The watchdog checks the local health
 endpoint and restarts the proxy if the Node process exits or stops responding.
+The task also runs every minute to recover if the watchdog itself exits.
+Install from a persistent directory outside `.codex/plugins/cache`: the task
+and command wrapper will use that directory directly, so clearing the plugin
+cache does not break the service. Do not delete or move the persistent directory
+while the service is enabled.
 Open or fork a Codex conversation after enabling it so Codex loads the updated
 provider configuration.
 
